@@ -432,7 +432,9 @@ function rand(min,max){ return Math.random()*(max-min)+min; }
 function spawnEnemy(atX=null, atY=null){
   const size = 30;
   const baseSpeed = 80;
-  let enemy = { size, speed: baseSpeed * state.settings[state.mode].enemySpeedMul, wobble:Math.random()*6, x:0, y:0, hp:1 * state.settings[state.mode].enemyHPmul, age:0 };
+  let enemy = { size, speed: baseSpeed * state.settings[state.mode].enemySpeedMul, wobble:Math.random()*6, x:0, y:0, hp:1 * state.settings[state.mode].enemyHPmul, 
+    canDash: (state.mode === 'hardcore' && Math.random() < 0.10),
+    dash: { active:false, timer:0, duration:0.18, vx:0, vy:0, cooldown:2.4, cdTimer:0 }, age:0 };
   if(atX!==null && atY!==null){ enemy.x = atX; enemy.y = atY; return enemy; }
   const side = Math.floor(Math.random()*4);
   if(side===0){ enemy.x = rand(0, canvas.width-size); enemy.y = -size; }
@@ -841,6 +843,38 @@ function update(dt){
   for(let ei=state.enemies.length-1; ei>=0; ei--){
     const e = state.enemies[ei];
     e.age += dt; e.wobble += dt * 6;
+    // Dash behavior for Hardcore mode enemies
+    if(e.canDash){
+        if(e.dash.active){
+            e.dash.timer += dt;
+            e.x += e.dash.vx * dt;
+            e.y += e.dash.vy * dt;
+            if(e.dash.timer >= e.dash.duration){
+                e.dash.active = false;
+                e.dash.timer = 0;
+            }
+        } else {
+            e.dash.cdTimer += dt;
+            if(e.dash.cdTimer >= e.dash.cooldown){
+                let tgt=null, d=1e9;
+                for(const p of state.players){
+                    if(!p.alive) continue;
+                    const dx = (p.x + p.size/2) - e.x;
+                    const dy = (p.y + p.size/2) - e.y;
+                    const dist = Math.hypot(dx,dy);
+                    if(dist < d){ d=dist; tgt=p; }
+                }
+                if(tgt){
+                    const inv = 1/Math.hypot((tgt.x - e.x),(tgt.y - e.y));
+                    e.dash.vx = (tgt.x - e.x) * inv * (state.players[0].dash.speed / 2);
+                    e.dash.vy = (tgt.y - e.y) * inv * (state.players[0].dash.speed / 2);
+                    e.dash.active = true;
+                    e.dash.cdTimer = 0;
+                }
+            }
+        }
+    }
+    if(e.canDash && e.dash.active) continue;
     // find nearest alive
     let tgt=null, d=1e9;
     for(const p of state.players){
@@ -951,7 +985,15 @@ function draw(){
   for(const e of state.enemies){
     const wob = Math.sin(e.wobble) * 6;
     ctx.save(); ctx.translate(e.x + e.size/2, e.y + e.size/2); ctx.rotate(wob * 0.03);
-    ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 14; ctx.fillStyle = '#ef4444'; ctx.fillRect(-e.size/2, -e.size/2, e.size, e.size);
+    if(e.canDash){
+    ctx.shadowColor = '#f97316'; // orange glow
+    ctx.shadowBlur = 20;
+    ctx.fillStyle = '#fb923c'; // orange fill
+} else {
+    ctx.shadowColor = '#ef4444';
+    ctx.shadowBlur = 14;
+    ctx.fillStyle = '#ef4444';
+}; ctx.fillRect(-e.size/2, -e.size/2, e.size, e.size);
     ctx.restore();
   }
 
