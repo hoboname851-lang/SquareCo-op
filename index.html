@@ -1,0 +1,1169 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>A Simple Game v2.0 [UDP:Co-op]</title>
+<style>
+  :root{
+    --bg:#0b1020;--panel:#0b1220;--accent:#3b82f6;--danger:#ef4444;--muted:#64748b;
+    --mode-normal-bg: radial-gradient(1200px 800px at 20% 10%, #0b1b3a 0%, #071428 45%, #031026 100%);
+    --mode-hardcore-bg: radial-gradient(1200px 800px at 80% 10%, #36040b 0%, #2b0206 45%, #1a0b10 100%);
+    --mode-endless-bg: radial-gradient(1200px 800px at 50% 50%, #2a0f5b 0%, #1a0630 45%, #040316 100%);
+    --mode-coop-bg: radial-gradient(1200px 800px at 50% 10%, #0f3a5b 0%, #0a1d30 45%, #040316 100%);
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:#e6eef8;
+    font-family:system-ui,Segoe UI,Roboto,Arial;user-select:none;overflow:hidden}
+  canvas{background:var(--mode-normal-bg);box-shadow:0 10px 50px rgba(2,6,23,.7);border-radius:14px;display:block;margin:auto}
+  .glow-blue{filter: drop-shadow(0 0 12px rgba(59,130,246,.8)) drop-shadow(0 0 24px rgba(59,130,246,.4));}
+  .glow-red{filter: drop-shadow(0 0 14px rgba(239,68,68,.8)) drop-shadow(0 0 28px rgba(239,68,68,.35));}
+  .glow-purple{filter: drop-shadow(0 0 14px rgba(124,58,237,.9)) drop-shadow(0 0 28px rgba(124,58,237,.35));}
+  .glow-gold{filter: drop-shadow(0 0 12px rgba(250,204,21,.9)) drop-shadow(0 0 24px rgba(250,204,21,.45));}
+  .glow-green{filter: drop-shadow(0 0 12px rgba(34,197,94,.9)) drop-shadow(0 0 24px rgba(34,197,94,.45));}
+  .glow-soft{filter: drop-shadow(0 4px 12px rgba(2,6,23,.5));}
+
+  #titleScreen{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px}
+  h1{font-size:44px; margin:0; color:#93c5fd; text-shadow:0 0 10px #60a5fa, 0 0 24px #3b82f6}
+  .btn{font-size:18px;padding:11px 20px;border-radius:12px;border:1px solid #ffffff12;background:#111827;color:#e6eef8;cursor:pointer;transition:transform .08s ease, box-shadow .15s ease}
+  .btn:hover{transform:translateY(-1px); box-shadow:0 8px 30px rgba(148,163,184,.18)}
+  .btn:active{transform:translateY(0)}
+  .btn-primary{background:linear-gradient(180deg,#2563eb,#1d4ed8); color:#fff; border-color:#ffffff22}
+  .btn-danger{background:linear-gradient(180deg,#dc2626,#b91c1c); color:#fff; border-color:#ffffff22}
+  .btn-gray{background:linear-gradient(180deg,#374151,#1f2937); color:#e5e7eb; border-color:#ffffff22}
+  .btn.glow-blue,.btn-primary{box-shadow:0 0 16px #3b82f685, 0 0 36px #3b82f64a}
+  .btn.glow-red,.btn-danger{box-shadow:0 0 16px #ef444485, 0 0 36px #ef44444a}
+  .btn.glow-purple{box-shadow:0 0 16px #7c3aed85, 0 0 36px #7c3aed4a}
+  .btn.glow-gold{box-shadow:0 0 16px #facc1585, 0 0 36px #facc154a}
+  .btn.glow-soft{box-shadow:0 8px 28px rgba(2,6,23,.55)}
+  .row{display:flex; gap:12px}
+
+  #modeSelectScreen{position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px}
+  .modeCard{width:min(900px,92%); background:linear-gradient(180deg,#0b1220,#071428);
+    padding:16px;border-radius:14px;border:1px solid #ffffff10; display:flex; justify-content:space-between; align-items:center; gap:12px}
+  .modeDesc{font-size:14px;color:#9fb0d6}
+  .modeBtn{padding:10px 14px;border-radius:10px;border:1px solid #ffffff18;cursor:pointer}
+  .mode-normal{background:#0ea5a4;color:#071428}
+  .mode-hardcore{background:#ef4444;color:#fff}
+  .mode-endless{background:#7c3aed;color:#fff}
+  .mode-coop{background:#22c55e;color:#071428}
+
+  .gameWrapper { width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; pointer-events: none;}
+  .gameWrapper canvas { pointer-events: auto; }
+
+  /* HUDs */
+  #hudWrap{position:fixed;top:10px;left:12px;display:flex;gap:10px;z-index:40;justify-content:space-between;width:calc(100% - 24px)}
+  .hudPanel{display:flex;align-items:center;gap:8px;background:linear-gradient(180deg,#1f2937,#0b1220);padding:8px 12px;border-radius:12px;border:1px solid #ffffff10}
+  .coinIcon{width:26px;height:26px;background:linear-gradient(180deg,#f59e0b,#facc15);display:flex;align-items:center;justify-content:center;border-radius:8px;color:#111;font-size:14px}
+  .hudName{font-weight:900;color:#9fb0d6;margin-right:4px}
+  .cooldown{background:linear-gradient(180deg,#0b1220,#071428);padding:8px 10px;border-radius:10px;border:1px solid #ffffff10;font-weight:700}
+
+  #modeLabel{position:fixed;bottom:12px;left:18px;background:linear-gradient(180deg,#0b1220,#071428);padding:8px 12px;border-radius:12px;border:1px solid #ffffff10;font-weight:800;z-index:40}
+
+  /* Skill columns */
+  #skillColumnP1{position:fixed; left:16px; top:80px; display:flex; flex-direction:column; gap:10px; z-index:50}
+  #skillColumnP2{position:fixed; right:16px; top:80px; display:flex; flex-direction:column; gap:10px; z-index:50}
+  .skillBox{min-width:150px; background:linear-gradient(180deg,#0b1220,#071428); border:1px solid #ffffff12; padding:8px 10px; border-radius:12px; display:flex; align-items:center; gap:10px}
+  .skillKey{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:#111827;border:1px solid #ffffff18;font-weight:900}
+  .skillInfo{display:flex;flex-direction:column;line-height:1.1}
+  .skillName{font-weight:800}
+  .skillCd{font-size:12px; color:#9fb0d6}
+
+  /* overlays */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:999}
+  .popup{background:linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.03));padding:18px;border-radius:14px;width:min(960px,94%);border:1px solid #ffffff10}
+  .cards{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+  .card{width:300px;padding:14px;border-radius:12px;background:linear-gradient(180deg,#fde68a,#fef3c7);
+        display:flex;flex-direction:column;align-items:center; box-shadow: 0 8px 30px rgba(0,0,0,.16)}
+  .chooseRow{display:flex;gap:8px;margin-top:8px}
+  .chooseBtn{padding:8px 12px;border-radius:10px;border:none;background:#2563eb;color:#fff;cursor:pointer}
+  .chooseBtn.alt{background:#16a34a}
+  .btn-skip{background:transparent;border:none;color:var(--danger);font-weight:800;cursor:pointer}
+  .popupTitle{background:#ef4444;color:#fff;padding:8px 12px;border-radius:8px; display:inline-block}
+
+  /* pause */
+  #pauseOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center;z-index:1200}
+  .pauseBox{background:linear-gradient(180deg,#071428,#081830);padding:22px;border-radius:14px;text-align:center;color:#e6eef8;border:1px solid #ffffff12}
+  .pauseBox button{margin:8px}
+
+  /* revive popup */
+  #reviveOverlay{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:none;align-items:center;justify-content:center;z-index:1500}
+  .reviveBox{background:linear-gradient(180deg,#0b1220,#0a1428);border:1px solid #ffffff18;border-radius:14px;padding:18px; width:min(520px,94%); text-align:center}
+  .reviveTimer{font-size:28px;font-weight:900;margin:8px 0;color:#facc15}
+  .reviveActions{display:flex;gap:10px;justify-content:center;margin-top:10px}
+
+  /* toast */
+  .toast{position:fixed;left:50%;transform:translateX(-50%) translateY(-8px);top:8px;background:rgba(2,6,23,0.9);color:#fff;padding:10px 16px;border-radius:12px;font-weight:800;z-index:1600;opacity:0;transition:opacity .18s,transform .18s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* settings */
+  #settingsBtn{position:fixed; left:18px; bottom:18px; z-index:60}
+  #settingsOverlay{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.55); z-index:1300}
+  .settingsPanel{width:min(520px,92%); background:linear-gradient(180deg,#0b1220,#0a1428); border:1px solid #ffffff12; border-radius:14px; padding:14px; position:relative}
+  .settingsClose{position:absolute; right:10px; top:10px; background:#111827; border:1px solid #ffffff18; border-radius:8px; width:34px; height:34px; cursor:pointer}
+
+  /* progress bar */
+  #progressBarContainer{position:fixed;left:0;bottom:0;width:100%;height:18px;background:#0f172a;display:none}
+  #progressBar{height:100%;width:0;background:linear-gradient(90deg,#3b82f6,#60a5fa);transition:width .25s}
+
+  @media(max-width:760px){
+    canvas{width:92%;height:auto}
+    .modeCard{width:92%}
+    .skillBox{min-width:140px}
+    #skillColumnP2{right:8px}
+  }
+</style>
+</head>
+<body>
+
+<!-- title -->
+<div id="titleScreen">
+  <h1 class="glow-blue">SQUARE GAME</h1>
+  <div class="row">
+    <button class="btn btn-primary glow-blue" id="playBtn">Play</button>
+    <button class="btn btn-danger glow-red" id="quitBtn">Quit</button>
+  </div>
+  <div style="font-size:14px;color:#9fb0d6" class="glow-soft">
+    P1: WASD, Q Dash, E/F/Z skill • P2: ↑↓←→, Shift Dash, I/O/P skill • Esc Pause
+  </div>
+</div>
+
+<!-- mode select -->
+<div id="modeSelectScreen">
+  <h1 style="font-size:34px;color:#60a5fa;margin:6px 0;text-shadow:0 0 6px #3b82f6">Chọn chế độ</h1>
+  <div class="modeCard glow-soft">
+    <div>
+      <div style="font-weight:900;font-size:18px">Normal</div>
+      <div class="modeDesc">Gameplay gốc — có boss, spawn vừa phải, dash cooldown chuẩn.</div>
+    </div>
+    <div><button class="modeBtn mode-normal glow-blue" data-mode="normal">Chơi Normal</button></div>
+  </div>
+  <div class="modeCard glow-soft">
+    <div>
+      <div style="font-weight:900;font-size:18px">Hardcore</div>
+      <div class="modeDesc">Quái mạnh hơn & nhanh hơn, boss trâu hơn, dash cooldown rút ngắn.</div>
+    </div>
+    <div><button class="modeBtn mode-hardcore glow-red" data-mode="hardcore">Chơi Hardcore</button></div>
+  </div>
+  <div class="modeCard glow-soft">
+    <div>
+      <div style="font-weight:900;font-size:18px">Endless</div>
+      <div class="modeDesc">Không có boss — quái spawn vô tận.</div>
+    </div>
+    <div><button class="modeBtn mode-endless glow-purple" data-mode="endless">Chơi Endless</button></div>
+  </div>
+  <div class="modeCard glow-soft">
+    <div>
+      <div style="font-weight:900;font-size:18px">2-Player Co-op</div>
+      <div class="modeDesc">Cùng chia sẻ bản đồ, quái, boss, power-up. HUD riêng, coin riêng. Revive đồng đội với 300 coin (team).</div>
+    </div>
+    <div><button class="modeBtn mode-coop glow-green" data-mode="coop">Chơi Co-op</button></div>
+  </div>
+  <div class="row"><button class="btn btn-danger glow-red" id="backFromMode">Back</button></div>
+</div>
+
+<div class="gameWrapper"><canvas id="game" width="900" height="540" style="display:none"></canvas></div>
+
+<div id="progressBarContainer"><div id="progressBar"></div></div>
+
+<!-- HUD (dynamic for 1P/2P) -->
+<div id="hudWrap" class="glow-soft" aria-live="polite"></div>
+
+<!-- Skill Columns -->
+<div id="skillColumnP1" style="display:none">
+  <div class="skillBox glow-red" id="skillE"><div class="skillKey">E</div><div class="skillInfo"><div class="skillName">TIÊU DIỆT</div><div class="skillCd" id="eCd">READY</div></div></div>
+  <div class="skillBox glow-gold" id="skillF"><div class="skillKey">F</div><div class="skillInfo"><div class="skillName">BIẾN VÀNG</div><div class="skillCd" id="fCd">READY</div></div></div>
+  <div class="skillBox glow-green" id="skillZ"><div class="skillKey">Z</div><div class="skillInfo"><div class="skillName">ĐỒNG MINH</div><div class="skillCd" id="zCd">READY</div></div></div>
+</div>
+<div id="skillColumnP2" style="display:none">
+  <div class="skillBox glow-red"><div class="skillKey">I</div><div class="skillInfo"><div class="skillName">TIÊU DIỆT</div><div class="skillCd" id="iCd">LOCKED</div></div></div>
+  <div class="skillBox glow-gold"><div class="skillKey">O</div><div class="skillInfo"><div class="skillName">BIẾN VÀNG</div><div class="skillCd" id="oCd">LOCKED</div></div></div>
+  <div class="skillBox glow-green"><div class="skillKey">P</div><div class="skillInfo"><div class="skillName">ĐỒNG MINH</div><div class="skillCd" id="pCd">LOCKED</div></div></div>
+</div>
+
+<div id="modeLabel" style="display:none" class="glow-soft">Mode: Normal</div>
+
+<!-- Power popup -->
+<div id="powerOverlay" class="overlay" aria-hidden="true">
+  <div class="popup glow-soft" role="dialog" aria-modal="true" aria-labelledby="popupTitle">
+    <div style="display:flex;justify-content:center;margin-bottom:12px"><strong id="popupTitle" class="popupTitle glow-red">PERKS</strong></div>
+    <div class="cards" id="powerCards"></div>
+    <div style="text-align:center;margin-top:10px"><button class="btn-skip glow-red" id="skipPowerBtn">BỎ QUA</button></div>
+  </div>
+</div>
+
+<!-- pause overlay -->
+<div id="pauseOverlay">
+  <div class="pauseBox glow-soft">
+    <div style="font-size:20px;margin-bottom:8px">PAUSED</div>
+    <div style="margin-bottom:12px;color:#9fb0d6">Press Continue to proceed or Back to return to the menu</div>
+    <div><button id="continueBtn" class="btn btn-primary glow-blue">Continue</button><button id="backToMenuBtn" class="btn btn-danger glow-red">Back</button></div>
+  </div>
+</div>
+
+<!-- revive overlay -->
+<div id="reviveOverlay">
+  <div class="reviveBox glow-soft">
+    <div style="font-size:22px;font-weight:900;margin-bottom:8px">HỒI SINH ĐỒNG ĐỘI?</div>
+    <div style="color:#9fb0d6">Tổng coin team ≥ 300. Chọn trong <span class="reviveTimer" id="reviveTimer">10</span> giây.</div>
+    <div style="margin-top:8px;font-size:13px;color:#9fb0d6">(Game tự động tạm dừng khi hộp thoại mở)</div>
+    <div class="reviveActions"><button id="reviveYes" class="btn btn-primary glow-blue">Có</button><button id="reviveNo" class="btn btn-danger glow-red">Không</button></div>
+  </div>
+</div>
+
+<!-- toast -->
+<div id="globalToast" class="toast glow-soft" role="status" aria-live="polite"></div>
+
+<script>
+/* ==================== Utils / DOM ==================== */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+const titleScreen = document.getElementById('titleScreen');
+const modeSelectScreen = document.getElementById('modeSelectScreen');
+const playBtn = document.getElementById('playBtn');
+const quitBtn = document.getElementById('quitBtn');
+const backFromMode = document.getElementById('backFromMode');
+const progressBarContainer = document.getElementById('progressBarContainer');
+const progressBar = document.getElementById('progressBar');
+
+const hudWrap = document.getElementById('hudWrap');
+const modeLabel = document.getElementById('modeLabel');
+
+const powerOverlay = document.getElementById('powerOverlay');
+const powerCards = document.getElementById('powerCards');
+const skipPowerBtn = document.getElementById('skipPowerBtn');
+
+const pauseOverlay = document.getElementById('pauseOverlay');
+const continueBtn = document.getElementById('continueBtn');
+const backToMenuBtn = document.getElementById('backToMenuBtn');
+
+const skillColumnP2 = document.getElementById('skillColumnP2');
+const eCd = document.getElementById('eCd'), fCd = document.getElementById('fCd'), zCd = document.getElementById('zCd');
+const iCd = document.getElementById('iCd'), oCd = document.getElementById('oCd'), pCd = document.getElementById('pCd');
+
+const reviveOverlay = document.getElementById('reviveOverlay');
+const reviveTimerEl = document.getElementById('reviveTimer');
+const reviveYes = document.getElementById('reviveYes');
+const reviveNo = document.getElementById('reviveNo');
+
+const globalToast = document.getElementById('globalToast');
+let toastTimer = null;
+function showToast(txt, ms = 2200){
+  clearTimeout(toastTimer);
+  globalToast.textContent = txt;
+  globalToast.classList.add('show');
+  toastTimer = setTimeout(()=> globalToast.classList.remove('show'), ms);
+}
+
+/* ==================== Audio ==================== */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playBeep(freq=440, time=0.06, type='sine', vol=0.08){
+  try{
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.value = vol;
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + time);
+    o.stop(audioCtx.currentTime + time + 0.02);
+  }catch(e){}
+}
+function swoosh(){
+  const dur = 0.22;
+  const sr = audioCtx.sampleRate;
+  const buffer = audioCtx.createBuffer(1, sr * dur, sr);
+  const data = buffer.getChannelData(0);
+  for(let i=0;i<data.length;i++){ data[i] = (Math.random()*2-1) * (1 - i/data.length); }
+  const noise = audioCtx.createBufferSource(); noise.buffer=buffer;
+  const filter = audioCtx.createBiquadFilter(); filter.type='highpass'; filter.frequency.value=1400;
+  const g = audioCtx.createGain(); g.gain.value = 0.45;
+  noise.connect(filter); filter.connect(g); g.connect(audioCtx.destination);
+  noise.start();
+
+  const o = audioCtx.createOscillator(); const g2 = audioCtx.createGain();
+  o.type='sawtooth'; o.frequency.setValueAtTime(900, audioCtx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + dur);
+  g2.gain.setValueAtTime(0.18, audioCtx.currentTime);
+  g2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur);
+  o.connect(g2); g2.connect(audioCtx.destination); o.start();
+  o.stop(audioCtx.currentTime + dur + 0.02);
+}
+function playPlop(){ playBeep(880, 0.08, 'triangle', 0.06); }
+function playKill(){ playBeep(320, 0.12, 'sawtooth', 0.09); }
+
+window.addEventListener('pointerdown', ()=>{ try{ audioCtx.resume(); ytPlay(); }catch(e){} }, { once:true });
+
+/* ==================== YouTube music control ==================== */
+const yt = document.getElementById('ytMusic');
+function ytPost(cmd){ try{ yt.contentWindow.postMessage(JSON.stringify({ event:'command', func: cmd }), '*'); }catch(e){} }
+function ytPlay(){ ytPost('playVideo'); }
+function ytPause(){ ytPost('pauseVideo'); }
+
+/* ==================== Game state ==================== */
+const settingsPresets = {
+  normal:  { enemySpeedMul:1, enemyHPmul:1, bossHPmul:1, dashCooldown:2, spawnInterval:5, backgroundVar:'var(--mode-normal-bg)', bossEnabled:true },
+  hardcore:{ enemySpeedMul:1.4, enemyHPmul:1.5, bossHPmul:2.0, dashCooldown:1.5, spawnInterval:3.5, backgroundVar:'var(--mode-hardcore-bg)', bossEnabled:true },
+  endless: { enemySpeedMul:1.0, enemyHPmul:1.0, bossHPmul:1.0, dashCooldown:2, spawnInterval:2.2, backgroundVar:'var(--mode-endless-bg)', bossEnabled:false },
+  coop:    { enemySpeedMul:1.0, enemyHPmul:1.0, bossHPmul:0.9, dashCooldown:2.2, spawnInterval:3.2, backgroundVar:'var(--mode-coop-bg)', bossEnabled:true }
+};
+const POWER_DEFS = [
+ { id:1, icon:'🔆', title:'Biến vàng', desc:'Mua để mở khóa & dùng (biến 10 enemy thành vàng, KHÔNG tính kill)', cost:100, stars:3, keyP1:'F', keyP2:'O' },
+ { id:2, icon:'💥', title:'Tiêu diệt', desc:'Mua để mở khóa & dùng (tiêu diệt 10 enemy xung quanh, CÓ tính kill)', cost:50, stars:2, keyP1:'E', keyP2:'I' },
+ { id:3, icon:'🤝', title:'Gọi đồng minh', desc:'Mua để mở khóa & dùng (tạo 5 đồng minh)', cost:150, stars:5, keyP1:'Z', keyP2:'P' }
+];
+function renderStars(n){ return '★'.repeat(n) + '☆'.repeat(Math.max(0,5-n)); }
+
+const state = {
+  mode:'normal',
+  twoPlayer:false,
+  inGame:false, isPaused:false, gameOver:false, win:false,
+  level:0, kills:0, killsNeeded:5,
+  boss:null, bossHits:0, bossHitsNeeded:10,
+  enemies:[], enemiesGold:[], power:null, particles:[], allies:[],
+  enemySpawnTimer:0, powerSpawnTimer:0,
+  shake:0,
+  players:[],
+  settings: settingsPresets,
+  revive:{
+    shown:false, counting:false, t:0, deadline:0
+  }
+};
+let last = performance.now();
+
+/* ==================== Player helpers ==================== */
+function mkPlayer(idx){
+  const base = {
+    idx, x:0, y:0, size:36, speed:220, hp:3, alive:true,
+    coins:30,
+    keys:{up:false,down:false,left:false,right:false},
+    dash:{ ready:true, cooldown:settingsPresets[state.mode].dashCooldown, cooldownTimer:0, active:false, vx:0, vy:0, duration:0.24, timer:0, speed:980 },
+    skills:{ gold:false, kill:false, ally:false },
+    cds:{ e:{ready:true,t:0,cd:10}, f:{ready:true,t:0,cd:40}, z:{ready:true,t:0,cd:15} }
+  };
+  return base;
+}
+function teamCoins(){ return state.players.reduce((s,p)=> s + p.coins, 0); }
+function deductTeam(amount){
+  // take from the richer first
+  let sorted = [...state.players].sort((a,b)=> b.coins - a.coins);
+  let need = amount;
+  for(const p of sorted){
+    const take = Math.min(p.coins, need);
+    p.coins -= take; need -= take;
+    if(need<=0) break;
+  }
+}
+function reset(){
+  state.enemies=[]; state.enemiesGold=[]; state.power=null; state.particles=[]; state.allies=[];
+  state.gameOver=false; state.win=false; state.level=0; state.kills=0; state.killsNeeded = state.twoPlayer ? 4 : 5;
+  state.enemySpawnTimer=0; state.powerSpawnTimer=0; state.boss=null; state.bossHits=0;
+  state.revive.shown=false; state.revive.counting=false;
+  // players
+  if(!state.twoPlayer){
+    state.players = [ mkPlayer(1) ];
+    const p = state.players[0];
+    p.x = canvas.width/2 - 20; p.y = canvas.height/2 - 20;
+  } else {
+    state.players = [ mkPlayer(1), mkPlayer(2) ];
+    state.players[0].x = canvas.width/2 - 80; state.players[0].y = canvas.height/2 - 20;
+    state.players[1].x = canvas.width/2 + 40; state.players[1].y = canvas.height/2 - 20;
+  }
+  applyModeSettings();
+  spawnEnemies(3);
+  buildHUD();
+  updateHUD();
+}
+function applyModeSettings(){
+  const s = state.settings[state.mode];
+  canvas.style.background = s.backgroundVar;
+  state.players.forEach(p=> p.dash.cooldown = s.dashCooldown);
+  state.bossHitsNeeded = Math.round(10 * s.bossHPmul);
+  modeLabel.style.display = 'block';
+  modeLabel.textContent = `Mode: ${capitalize(state.mode)}${state.twoPlayer?' (Co-op)':''}`;
+}
+function capitalize(s){ return s.charAt(0).toUpperCase() + s.slice(1); }
+
+/* ==================== HUD ==================== */
+function buildHUD(){
+  hudWrap.innerHTML='';
+  const makeHud = (p, name)=>{
+    const panel = document.createElement('div'); panel.className='hudPanel';
+    panel.innerHTML = `<span class="hudName">${name}</span>
+      <div class="coinIcon">💰</div><div id="coinVal${p.idx}">${p.coins}</div>
+      <div class="cooldown">Dash: <span id="dashTxt${p.idx}">READY</span></div>
+      <div class="cooldown">HP: <span id="hpTxt${p.idx}">${p.hp}</span></div>`;
+    return panel;
+  };
+  const p1 = makeHud(state.players[0], 'P1');
+  hudWrap.appendChild(p1);
+  if(state.twoPlayer){
+    const p2 = makeHud(state.players[1], 'P2');
+    hudWrap.appendChild(p2);
+    skillColumnP2.style.display='flex';
+  } else {
+    skillColumnP2.style.display='none';
+  }
+}
+function updateHUD(){
+  state.players.forEach(p=>{
+    const coinEl = document.getElementById('coinVal'+p.idx);
+    const dashEl = document.getElementById('dashTxt'+p.idx);
+    const hpEl = document.getElementById('hpTxt'+p.idx);
+    if(coinEl) coinEl.textContent = Math.max(0, Math.floor(p.coins));
+    if(dashEl) dashEl.textContent = p.dash.ready ? 'READY' : `${Math.max(0,(p.dash.cooldown - p.dash.cooldownTimer)).toFixed(1)}s`;
+    if(hpEl) hpEl.textContent = p.hp + (p.alive?'':' (X)');
+  });
+  // skill cds
+  const p1 = state.players[0];
+  eCd.textContent = p1.skills.kill ? (p1.cds.e.ready?'READY':`${(p1.cds.e.cd - p1.cds.e.t).toFixed(1)}s`) : 'LOCKED';
+  fCd.textContent = p1.skills.gold ? (p1.cds.f.ready?'READY':`${(p1.cds.f.cd - p1.cds.f.t).toFixed(1)}s`) : 'LOCKED';
+  zCd.textContent = p1.skills.ally ? (p1.cds.z.ready?'READY':`${(p1.cds.z.cd - p1.cds.z.t).toFixed(1)}s`) : 'LOCKED';
+  if(state.twoPlayer){
+    const p2 = state.players[1];
+    iCd.textContent = p2.skills.kill ? (p2.cds.e.ready?'READY':`${(p2.cds.e.cd - p2.cds.e.t).toFixed(1)}s`) : 'LOCKED';
+    oCd.textContent = p2.skills.gold ? (p2.cds.f.ready?'READY':`${(p2.cds.f.cd - p2.cds.f.t).toFixed(1)}s`) : 'LOCKED';
+    pCd.textContent = p2.skills.ally ? (p2.cds.z.ready?'READY':`${(p2.cds.z.cd - p2.cds.z.t).toFixed(1)}s`) : 'LOCKED';
+  }
+}
+
+/* ==================== Spawning ==================== */
+function rand(min,max){ return Math.random()*(max-min)+min; }
+function spawnEnemy(atX=null, atY=null){
+  const size = 30;
+  const baseSpeed = 80;
+  let enemy = { size, speed: baseSpeed * state.settings[state.mode].enemySpeedMul, wobble:Math.random()*6, x:0, y:0, hp:1 * state.settings[state.mode].enemyHPmul, age:0 };
+  if(atX!==null && atY!==null){ enemy.x = atX; enemy.y = atY; return enemy; }
+  const side = Math.floor(Math.random()*4);
+  if(side===0){ enemy.x = rand(0, canvas.width-size); enemy.y = -size; }
+  else if(side===1){ enemy.x = rand(0, canvas.width-size); enemy.y = canvas.height + size; }
+  else if(side===2){ enemy.x = -size; enemy.y = rand(0, canvas.height-size); }
+  else { enemy.x = canvas.width + size; enemy.y = rand(0, canvas.height-size); }
+  return enemy;
+}
+function spawnEnemies(n){ for(let i=0;i<n;i++) state.enemies.push(spawnEnemy()); }
+function spawnPower(){
+  if(state.power) return;
+  const px = rand(20, canvas.width-50);
+  const py = rand(20, canvas.height-50);
+  if(state.boss){
+    const r = Math.random();
+    const type = (r < 0.60) ? 2 : 0; // red or yellow
+    state.power = { x:px, y:py, size:30, type };
+  } else {
+    const r = Math.random();
+    const type = (r < 0.50) ? 0 : 1; // yellow or purple
+    state.power = { x:px, y:py, size:30, type };
+  }
+}
+
+/* ==================== Leveling ==================== */
+function updateKillsNeeded(level){
+  if(state.twoPlayer){ // giảm chỉ tiêu khi 2P
+    if(level===0) return 4;
+    if(level===1) return 8;
+    if(level===2) return 12;
+    if(level===3) return 18;
+    if(level===4) return 28;
+    return 9999;
+  } else {
+    if(level===0) return 5;
+    if(level===1) return 10;
+    if(level===2) return 15;
+    if(level===3) return 22;
+    if(level===4) return 44;
+    return 9999;
+  }
+}
+function onEnemyKilled(){ state.kills++; if(state.kills >= state.killsNeeded && state.level < 5){ pauseForLevelUp(); } }
+function pauseForLevelUp(){ state.isPaused = true; state.level++; state.kills = 0; state.killsNeeded = updateKillsNeeded(state.level); showPowerPopup(); }
+
+/* ==================== Boss (unchanged core, respects nearest alive) ==================== */
+function startBossEncounter(){ if(!state.settings[state.mode].bossEnabled) return;
+  state.enemies = []; state.bossHits = 0;
+  const baseSpeed = 60 * 3 * (state.mode === 'hardcore' ? 1.15 : 1);
+  state.boss = {
+    x: canvas.width/2 - 60, y: canvas.height/2 - 60,
+    size: 120,
+    speed: baseSpeed,
+    active: true, warn: null, dash: null, abilityTimer: 0,
+    abilityCooldown: state.mode === 'hardcore' ? 2.6 : 3.5
+  };
+  showToast('BOSS XUẤT HIỆN!');
+}
+function bossTakeHit(){
+  state.bossHits++;
+  spawnParticles(state.boss.x + state.boss.size/2, state.boss.y + state.boss.size/2, 18, '#ff9fb1');
+  playKill();
+  showToast(`Boss bị đánh ${state.bossHits}/${state.bossHitsNeeded}`);
+  if(state.bossHits >= state.bossHitsNeeded){
+    state.win = true; state.inGame = false; state.isPaused = true; state.boss = null;
+    showToast('YOU WIN! Boss đã bị hạ gục 🎉', 4000);
+  }
+}
+function bossTarget(){
+  // target nearest alive player
+  let best=null, d=1e9;
+  for(const p of state.players){ if(!p.alive) continue; const dx = (p.x+p.size/2) - (state.boss.x+state.boss.size/2), dy=(p.y+p.size/2)-(state.boss.y+state.boss.size/2); const dd=Math.hypot(dx,dy); if(dd<d){d=dd; best=p;} }
+  return best || state.players[0];
+}
+function updateBoss(dt){
+  const b = state.boss; if(!b) return;
+  b.abilityTimer += dt;
+  if(b.abilityTimer >= b.abilityCooldown){
+    b.abilityTimer = 0;
+    if(Math.random() < 0.5) bossDoDash();
+    else bossDoSpawnMinions();
+  }
+  if(b.dash && b.dash.active){
+    const t = b.dash;
+    const dx = t.targetX - b.x, dy = t.targetY - b.y, dist = Math.hypot(dx,dy);
+    const dashSpeed = b.speed * 3;
+    if(dist > 1){ b.x += (dx/dist) * dashSpeed * dt; b.y += (dy/dist) * dashSpeed * dt; }
+    else { t.active = false; b.dash.active = false; spawnParticles(b.x + b.size/2, b.y + b.size/2, 20, '#ff7b7b'); }
+    // hit any player
+    for(const p of state.players){
+      if(!p.alive) continue;
+      if(rectsOverlap(b.x,b.y,b.size,b.size, p.x, p.y, p.size, p.size)){
+        damagePlayer(p, 3, 'Bị boss húc!');
+      }
+    }
+  }
+}
+function bossDoDash(){
+  const b = state.boss; if(!b || !b.active) return;
+  const tgt = bossTarget();
+  const dirX = (tgt.x + tgt.size/2) - (b.x + b.size/2), dirY = (tgt.y + tgt.size/2) - (b.y + b.size/2);
+  const dist = Math.hypot(dirX,dirY) || 1;
+  const warnX = b.x + (dirX/dist)*(b.size/2 + 18);
+  const warnY = b.y + (dirY/dist)*(b.size/2 + 18);
+  b.warn = { x: warnX, y: warnY, expires: performance.now() + 800 };
+  setTimeout(()=>{ if(!state.boss) return; const targetX = tgt.x, targetY = tgt.y; state.boss.dash = { targetX, targetY, active:true }; state.boss.dash.active = true; playBeep(120,0.12,'sawtooth',0.12); }, 800);
+}
+function bossDoSpawnMinions(){
+  const b = state.boss; if(!b || !b.active) return;
+  b.active = false;
+  const bx = b.x + b.size/2, by = b.y + b.size/2;
+  for(let i=0;i<5;i++){
+    const ex = Math.max(10, Math.min(canvas.width-40, bx + (Math.random()-0.5)*90));
+    const ey = Math.max(10, Math.min(canvas.height-40, by + (Math.random()-0.5)*90));
+    state.enemies.push(spawnEnemy(ex,ey));
+  }
+  const check = setInterval(()=>{
+    if(!state.boss){ clearInterval(check); return; }
+    if(state.enemies.length === 0){
+      state.boss.x = Math.max(10, Math.min(canvas.width-state.boss.size-10, canvas.width/2 - state.boss.size/2));
+      state.boss.y = Math.max(10, Math.min(canvas.height-state.boss.size-10, canvas.height/2 - state.boss.size/2));
+      state.boss.active = true;
+      spawnParticles(state.boss.x + state.boss.size/2, state.boss.y + state.boss.size/2, 24, '#c084fc');
+      clearInterval(check); playBeep(480,0.12,'sine',0.08);
+    }
+  }, 300);
+}
+
+/* ==================== Popups ==================== */
+function showPowerPopup(){
+  powerCards.innerHTML = ''; state.players.forEach(p=> p.perkChosen = false);
+  const for2p = state.twoPlayer;
+  for(const def of POWER_DEFS){
+    const card = document.createElement('div');
+    card.className='card glow-gold';
+    const extra = for2p ? `<div class="chooseRow">
+      <button class="chooseBtn glow-blue buyP1">CHỌN cho P1 (${def.keyP1})</button>
+      <button class="chooseBtn alt glow-green buyP2">CHỌN cho P2 (${def.keyP2})</button>
+    </div>` : `<div class="chooseRow"><button class="chooseBtn glow-blue buyP1">CHỌN</button></div>`;
+    card.innerHTML = `<div style="font-size:32px">${def.icon}</div>
+      <div style="font-weight:800;margin-top:6px">${def.title}</div>
+      <div style="font-size:13px;color:#334155;margin:8px 0;text-align:center">${def.desc}</div>
+      <div style="font-weight:900;color:#065f46">Giá: ${def.cost} vàng</div>
+      <div style="margin:8px 0">${renderStars(def.stars)}</div>
+      ${extra}`;
+    const btn1 = card.querySelector('.buyP1');
+    btn1.addEventListener('click', e=>{ e.stopPropagation(); buyPowerFromPopup(def.id, 0); });
+    const btn2 = card.querySelector('.buyP2');
+    if(btn2) btn2.addEventListener('click', e=>{ e.stopPropagation(); buyPowerFromPopup(def.id, 1); });
+    powerCards.appendChild(card);
+  }
+  powerOverlay.style.display = 'flex';
+  powerOverlay.setAttribute('aria-hidden','false');
+  state.isPaused = true;
+  state.enemySpawnTimer = 0;
+  updatePopupAffordability();
+}
+function updatePopupAffordability(){
+  Array.from(powerCards.children).forEach((card, i)=>{
+    const def = POWER_DEFS[i];
+    const p1 = state.players[0], p2 = state.players[1];
+    const b1 = card.querySelector('.buyP1'); if(b1) b1.style.opacity = (p1.coins < def.cost) ? '0.6' : '1';
+    const b2 = card.querySelector('.buyP2'); if(b2) b2.style.opacity = (!p2 || p2.coins < def.cost) ? '0.6' : '1';
+  });
+}
+
+function buyPowerFromPopup(typeId, playerIdx){
+  const def = POWER_DEFS.find(d=>d.id===typeId); if(!def) return;
+  const p = state.players[playerIdx||0];
+  if(!p) return;
+  if(p.coins < def.cost){ showToast('Không đủ vàng để mua!'); return; }
+  p.coins -= def.cost; updateHUD();
+  if(typeId===1){ p.skills.gold = true; }
+  else if(typeId===2){ p.skills.kill = true; }
+  else if(typeId===3){ p.skills.ally = true; }
+  p.perkChosen = true;
+  disablePerkButtons(playerIdx);
+  showToast(`P${p.idx} mở khóa skill!`);
+  if(state.players.every(pp=> pp.perkChosen || !state.twoPlayer)){ closePowerPopup(); }
+}
+function disablePerkButtons(playerIdx){
+  const buttons = powerCards.querySelectorAll(playerIdx===0 ? '.buyP1' : '.buyP2');
+  buttons.forEach(btn=> btn.disabled = true);
+}
+
+function closePowerPopup(){
+  powerOverlay.style.display = 'none';
+  powerOverlay.setAttribute('aria-hidden','true');
+  state.isPaused = false;
+  if(state.level >= 5 && !state.boss && state.settings[state.mode].bossEnabled) startBossEncounter();
+}
+skipPowerBtn.addEventListener('click', ()=>{ state.players.forEach(p=>p.perkChosen=true); closePowerPopup(); showToast('Bỏ qua — tiếp tục'); });
+
+/* ==================== Revive ==================== */
+let reviveTimer = null;
+function maybeOfferRevive(){
+  if(!state.twoPlayer) return;
+  const dead = state.players.find(p=>!p.alive);
+  const alive = state.players.find(p=>p.alive);
+  if(!dead || !alive) return;
+  if(state.revive.shown || state.revive.counting) return;
+  if(teamCoins() >= 300){
+    state.revive.shown = true;
+    state.isPaused = true;
+    reviveOverlay.style.display='flex';
+    let left = 10;
+    reviveTimerEl.textContent = left;
+    reviveTimer = setInterval(()=>{
+      left--; reviveTimerEl.textContent = left;
+      if(left<=0){ closeRevive(false); }
+    }, 1000);
+  }
+}
+function closeRevive(did){
+  if(reviveTimer){ clearInterval(reviveTimer); reviveTimer = null; }
+  reviveOverlay.style.display='none';
+  state.isPaused = false;
+  state.revive.counting=false;
+  state.revive.shown=false;
+  if(did){
+    // spend and revive first dead we find
+    deductTeam(300);
+    const dead = state.players.find(p=>!p.alive);
+    if(dead){
+      dead.alive = true; dead.hp = 2; // revive with 2 HP
+      showToast(`Đã hồi sinh P${dead.idx}!`);
+    }
+    updateHUD();
+  }
+}
+reviveYes.addEventListener('click', ()=> closeRevive(true));
+reviveNo.addEventListener('click', ()=> closeRevive(false));
+
+/* ==================== Particles & shake ==================== */
+function spawnParticles(x,y,count,color){
+  for(let i=0;i<count;i++){
+    const angle = Math.random()*Math.PI*2;
+    const speed = rand(60,240);
+    state.particles.push({ x,y,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,age:0,life:0.45+Math.random()*0.8,size:2+Math.random()*5,color });
+  }
+}
+function updateParticles(dt){
+  for(let i=state.particles.length-1;i>=0;i--){
+    const p = state.particles[i];
+    p.age += dt; if(p.age >= p.life){ state.particles.splice(i,1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 120*dt;
+  }
+}
+function addShake(intensity=6){ state.shake = Math.max(state.shake, intensity); }
+
+/* ==================== Allies ==================== */
+function spawnAllies(n, around){
+  for(let i=0;i<n;i++) state.allies.push({x:around.x,y:around.y,size:20,speed:130,wobble:Math.random()*6, hp:3});
+}
+function updateAllies(dt){
+  for(let ai=state.allies.length-1; ai>=0; ai--){
+    const ally = state.allies[ai];
+    if(state.enemies.length===0) continue;
+    let nearest=null, idx=-1, minDist=9e9;
+    for(let ei=0; ei<state.enemies.length; ei++){
+      const e = state.enemies[ei];
+      const dx = e.x - ally.x, dy = e.y - ally.y, dist=Math.hypot(dx,dy);
+      if(dist < minDist){ minDist = dist; nearest=e; idx=ei; }
+    }
+    if(!nearest) continue;
+    if(minDist>0){
+      ally.x += ((nearest.x - ally.x)/minDist) * ally.speed * dt;
+      ally.y += ((nearest.y - ally.y)/minDist) * ally.speed * dt;
+    }
+    if(ally.x < nearest.x + nearest.size && ally.x + ally.size > nearest.x && ally.y < nearest.y + nearest.size && ally.y + ally.size > nearest.y){
+      state.enemies.splice(idx,1); onEnemyKilled();
+      spawnParticles(ally.x+ally.size/2, ally.y+ally.size/2, 12, '#22c55e');
+      ally.hp -= 1; playPlop();
+      if(ally.hp <= 0){
+        state.allies.splice(ai,1); spawnParticles(ally.x+ally.size/2, ally.y+ally.size/2, 10, '#ff8fb0');
+      }
+    }
+  }
+}
+
+/* ==================== Utility ==================== */
+function rectsOverlap(x1,y1,w1,h1,x2,y2,w2,h2){ return x1 < x2 + w2 && x1 + w1 > x2 && y1 + h1 > y2 && y1 < y2 + h2; }
+
+/* ==================== Skills ==================== */
+function skillKill(p){ if(!p.alive) return showToast(`P${p.idx} đã chết, không thể dùng skill`);
+  if(!p.skills.kill) return showToast(`P${p.idx}: Chưa mở khóa`);
+  if(!p.cds.e.ready) return showToast(`P${p.idx}: đang hồi`);
+  let count = 0;
+  for(let i=state.enemies.length-1; i>=0 && count<10; i--){
+    const e = state.enemies[i];
+    state.enemiesGold.push({x:e.x,y:e.y,size:20});
+    state.enemies.splice(i,1);
+    onEnemyKilled();
+    spawnParticles(e.x+e.size/2, e.y+e.size/2, 18, '#ff6b6b');
+    count++;
+  }
+  addShake(8); playKill();
+  p.cds.e.ready=false; p.cds.e.t=0;
+  updateHUD();
+}
+function skillGold(p){ if(!p.alive) return showToast(`P${p.idx} đã chết, không thể dùng skill`);
+  if(!p.skills.gold) return showToast(`P${p.idx}: Chưa mở khóa`);
+  if(!p.cds.f.ready) return showToast(`P${p.idx}: đang hồi`);
+  let count = 0;
+  for(let i=state.enemies.length-1; i>=0 && count<10; i--){
+    const e = state.enemies[i];
+    state.enemiesGold.push({x:e.x,y:e.y,size:20});
+    state.enemies.splice(i,1);
+    spawnParticles(e.x+e.size/2, e.y+e.size/2, 14, '#facc15');
+    count++;
+  }
+  addShake(6); playPlop();
+  p.cds.f.ready=false; p.cds.f.t=0;
+  updateHUD();
+}
+function skillAlly(p){ if(!p.alive) return showToast(`P${p.idx} đã chết, không thể dùng skill`);
+  if(!p.skills.ally) return showToast(`P${p.idx}: Chưa mở khóa`);
+  if(!p.cds.z.ready) return showToast(`P${p.idx}: đang hồi`);
+  spawnAllies(5, p);
+  spawnParticles(p.x+p.size/2, p.y+p.size/2, 16, '#22c55e');
+  playPlop();
+  p.cds.z.ready=false; p.cds.z.t=0;
+  updateHUD();
+}
+
+/* ==================== Damage / Death ==================== */
+function damagePlayer(p, dmg=1, msg='Bị tấn công!'){
+  if(!p.alive) return;
+  p.hp -= dmg;
+  addShake(6); playBeep(120,0.2,'sine',0.15);
+  showToast(`P${p.idx}: ${msg}`);
+  if(p.hp <= 0){
+    p.alive = false;
+    spawnParticles(p.x+p.size/2, p.y+p.size/2, 30, '#ff6b6b');
+    showToast(`P${p.idx} đã gục...`);
+    if(state.twoPlayer){
+      // offer revive when teamCoins>=300
+      setTimeout(maybeOfferRevive, 400);
+    } else {
+      state.gameOver = true;
+    }
+  }
+}
+
+/* ==================== Update loop ==================== */
+function update(dt){
+  if(state.gameOver || state.win){ updateParticles(dt); return; }
+  if(state.isPaused){ updateParticles(dt); return; }
+
+  // cooldowns
+  for(const p of state.players){
+    // dash
+    if(!p.dash.ready){
+      p.dash.cooldownTimer += dt;
+      if(p.dash.cooldownTimer >= p.dash.cooldown){
+        p.dash.cooldownTimer = 0; p.dash.ready = true; showToast(`P${p.idx} Dash ready!`);
+      }
+    }
+    // skills
+    for(const key of ['e','f','z']){
+      const cd = p.cds[key];
+      if(!cd.ready){ cd.t += dt; if(cd.t >= cd.cd){ cd.t=0; cd.ready=true; showToast(`P${p.idx} ${key.toUpperCase()} READY`); } }
+    }
+  }
+
+  // player movement & dash
+  for(const p of state.players){
+    if(!p.alive) continue;
+    if(p.dash.active){
+      p.dash.timer += dt;
+      p.x += p.dash.vx * dt;
+      p.y += p.dash.vy * dt;
+      if(p.dash.timer >= p.dash.duration){
+        p.dash.active = false; p.dash.timer = 0;
+      }
+    } else {
+      let vx=0,vy=0; if(p.keys.up) vy -= 1; if(p.keys.down) vy += 1; if(p.keys.left) vx -= 1; if(p.keys.right) vx += 1;
+      if(vx!==0 || vy!==0){
+        const inv = 1/Math.hypot(vx,vy); vx *= inv; vy *= inv;
+        p.x = Math.max(0, Math.min(canvas.width - p.size, p.x + vx * p.speed * dt));
+        p.y = Math.max(0, Math.min(canvas.height - p.size, p.y + vy * p.speed * dt));
+        spawnParticles(p.x + p.size/2, p.y + p.size/2, 1, p.idx===1?'#60a5fa':'#34d399');
+        playBeep(1200, 0.02, 'sine', 0.004);
+      }
+    }
+  }
+
+  // enemy spawning
+  state.enemySpawnTimer += dt;
+  const spawnInterval = state.settings[state.mode].spawnInterval;
+  if(state.enemySpawnTimer >= spawnInterval){
+    state.enemySpawnTimer = 0;
+    const spawnCount = state.mode === 'endless' ? 2 + Math.floor(Math.random()*2) : 1;
+    spawnEnemies(spawnCount);
+  }
+
+  // power spawn
+  const powerInterval = state.boss ? 3 : 10;
+  state.powerSpawnTimer += dt;
+  if(state.powerSpawnTimer >= powerInterval){
+    state.powerSpawnTimer = 0;
+    if(!state.power) spawnPower();
+  }
+
+  // enemies chase nearest alive player
+  for(let ei=state.enemies.length-1; ei>=0; ei--){
+    const e = state.enemies[ei];
+    e.age += dt; e.wobble += dt * 6;
+    // find nearest alive
+    let tgt=null, d=1e9;
+    for(const p of state.players){
+      if(!p.alive) continue;
+      const dx = (p.x + p.size/2) - e.x, dy = (p.y + p.size/2) - e.y;
+      const dist = Math.hypot(dx,dy);
+      if(dist < d){ d=dist; tgt=p; }
+    }
+    if(tgt){
+      if(d>0){ e.x += ((tgt.x + tgt.size/2 - e.x)/d) * e.speed * dt; e.y += ((tgt.y + tgt.size/2 - e.y)/d) * e.speed * dt; }
+      if(rectsOverlap(tgt.x, tgt.y, tgt.size, tgt.size, e.x, e.y, e.size, e.size)){
+        // damage the target and remove enemy
+        state.enemies.splice(ei,1);
+        damagePlayer(tgt, 1, 'dính quái!');
+      }
+    }
+  }
+
+  // pick power
+  if(state.power){
+    for(const p of state.players){
+      if(!p.alive) continue;
+      if(rectsOverlap(p.x,p.y,p.size,p.size, state.power.x, state.power.y, state.power.size, state.power.size)){
+        if(state.power.type === 0){ // yellow vanish
+          state.enemies.splice(0,8);
+          spawnParticles(p.x + p.size/2, p.y + p.size/2, 16, '#fbbf24'); playPlop();
+        } else if(state.power.type === 1){ // purple gold
+          state.enemiesGold = state.enemies.map(e => ({x:e.x,y:e.y,size:20}));
+          state.enemies = [];
+          spawnParticles(p.x + p.size/2, p.y + p.size/2, 18, '#a855f7'); playPlop();
+        } else if(state.power.type === 2){ // red KILL
+          if(state.boss) bossTakeHit();
+          let c = 6; for(let i=state.enemies.length-1; i>=0 && c>0; i--){ const e = state.enemies[i]; state.enemiesGold.push({x:e.x,y:e.y,size:20}); state.enemies.splice(i,1); c--; }
+          spawnParticles(p.x + p.size/2, p.y + p.size/2, 20, '#ff6b6b'); playKill();
+        }
+        state.power = null;
+        break;
+      }
+    }
+  }
+
+  // collect gold -> +10 coins to whoever touches
+  if(state.enemiesGold.length > 0){
+    for(const p of state.players){
+      if(!p.alive) continue;
+      for(let i=state.enemiesGold.length-1;i>=0;i--){
+        const g = state.enemiesGold[i];
+        if(rectsOverlap(p.x,p.y,p.size,p.size, g.x,g.y,g.size,g.size)){
+          state.enemiesGold.splice(i,1);
+          p.coins += 10; updateHUD(); onEnemyKilled();
+          spawnParticles(p.x + p.size/2, p.y + p.size/2, 8, '#facc15'); playPlop();
+        }
+      }
+    }
+  }
+
+  updateAllies(dt);
+  if(state.boss) updateBoss(dt);
+  updateParticles(dt);
+  updateHUD();
+
+  // check game over in coop: both dead
+  if(state.twoPlayer){
+    if(state.players.every(p=>!p.alive)){
+      state.gameOver = true; showToast('Cả hai đã gục... GAME OVER', 4000);
+    } else {
+      // if one dead and not yet shown, maybe show revive
+      maybeOfferRevive();
+    }
+  }
+}
+
+/* ==================== Draw ==================== */
+function draw(){
+  let ox = 0, oy = 0;
+  if(state.shake > 0){ ox = (Math.random()*2-1) * state.shake; oy = (Math.random()*2-1) * state.shake; state.shake *= 0.90; if(state.shake < 0.5) state.shake = 0; }
+  ctx.setTransform(1,0,0,1,ox,oy);
+  ctx.clearRect(-ox,-oy,canvas.width,canvas.height);
+
+  // grid
+  ctx.save();
+  ctx.fillStyle = 'rgba(255,255,255,0.015)';
+  for(let gx=0; gx<canvas.width; gx+=40){ ctx.fillRect(gx,0,1,canvas.height); }
+  for(let gy=0; gy<canvas.height; gy+=40){ ctx.fillRect(0,gy,canvas.width,1); }
+  ctx.restore();
+
+  // background tint by mode
+  const wave = Math.sin(performance.now()/1200) * 0.03 + 0.06;
+  ctx.save();
+  if(state.mode === 'normal'){ ctx.fillStyle = `rgba(59,130,246,${0.02 + wave})`; }
+  else if(state.mode === 'hardcore'){ ctx.fillStyle = `rgba(239,68,68,${0.03 + wave})`; }
+  else if(state.mode === 'endless'){ ctx.fillStyle = `rgba(124,58,237,${0.03 + wave})`; }
+  else { ctx.fillStyle = `rgba(34,197,94,${0.03 + wave})`; }
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.restore();
+
+  // players
+  for(const p of state.players){
+    const pulse = 1 + Math.sin(performance.now()/420 + p.idx) * 0.03;
+    ctx.save(); ctx.translate(p.x + p.size/2, p.y + p.size/2); ctx.scale(pulse,pulse);
+    ctx.shadowColor = p.idx===1 ? '#60a5fa' : '#34d399';
+    ctx.shadowBlur = 18; ctx.fillStyle = p.alive ? (p.idx===1 ? '#3b82f6' : '#10b981') : '#64748b';
+    ctx.fillRect(-p.size/2, -p.size/2, p.size, p.size);
+    ctx.restore();
+  }
+
+  // enemies
+  for(const e of state.enemies){
+    const wob = Math.sin(e.wobble) * 6;
+    ctx.save(); ctx.translate(e.x + e.size/2, e.y + e.size/2); ctx.rotate(wob * 0.03);
+    ctx.shadowColor = '#ef4444'; ctx.shadowBlur = 14; ctx.fillStyle = '#ef4444'; ctx.fillRect(-e.size/2, -e.size/2, e.size, e.size);
+    ctx.restore();
+  }
+
+  // gold
+  ctx.save(); ctx.shadowColor = '#facc15'; ctx.shadowBlur = 14; ctx.fillStyle = '#facc15';
+  for(const g of state.enemiesGold){ ctx.fillRect(g.x, g.y, g.size, g.size); }
+  ctx.restore();
+
+  // allies
+  for(const a of state.allies){
+    const bob = Math.sin(a.wobble + performance.now()/600) * 3;
+    ctx.save(); ctx.translate(a.x, a.y + bob); ctx.shadowColor = '#22c55e'; ctx.shadowBlur = 12; ctx.fillStyle = '#22c55e'; ctx.fillRect(0,0,a.size,a.size); ctx.restore();
+  }
+
+  // power
+  if(state.power){
+    ctx.save();
+    if(state.power.type === 0){ ctx.shadowColor='#fbbf24'; ctx.fillStyle='#fbbf24'; }
+    else if(state.power.type === 1){ ctx.shadowColor='#a855f7'; ctx.fillStyle='#a855f7'; }
+    else { ctx.shadowColor='#ef4444'; ctx.fillStyle='#ef4444'; }
+    ctx.shadowBlur=14;
+    const s = state.power.size * (1 + Math.sin(performance.now()/300)*0.05);
+    ctx.fillRect(state.power.x, state.power.y, s, s);
+    if(state.power.type===2){
+      ctx.fillStyle = '#fff'; ctx.shadowBlur=0; ctx.font = '12px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText('KILL', state.power.x + s/2, state.power.y + s/2 + 4);
+    }
+    ctx.restore();
+  }
+
+  // boss
+  if(state.boss){
+    const b = state.boss;
+    const bp = 1 + Math.sin(performance.now()/420)*0.04;
+    if(b.active){
+      ctx.save();
+      ctx.translate(b.x + b.size/2, b.y + b.size/2); ctx.scale(bp,bp);
+      ctx.shadowColor = '#fb7185'; ctx.shadowBlur = 22; ctx.fillStyle = '#7c3aed';
+      ctx.fillRect(-b.size/2, -b.size/2, b.size, b.size);
+      const flame = Math.abs(Math.sin(performance.now()/120));
+      ctx.fillStyle = `rgba(255,${120 + (flame*80)|0},0,${0.18 + flame*0.12})`;
+      ctx.fillRect(-b.size/2, -b.size/2, b.size, b.size);
+      ctx.fillStyle = '#fff'; ctx.font = '22px system-ui'; ctx.textAlign = 'center'; ctx.fillText('BOSS', 0, 8);
+      ctx.restore();
+      if(b.warn && performance.now() < b.warn.expires){
+        ctx.beginPath(); ctx.fillStyle = '#ff3b3b'; ctx.arc(b.warn.x, b.warn.y, 10 + Math.sin(performance.now()/120)*2, 0, Math.PI*2); ctx.fill();
+      }
+    } else {
+      ctx.fillStyle = 'rgba(124,58,237,0.08)'; ctx.fillRect(b.x,b.y,b.size,b.size);
+    }
+    // HP bar
+    const hpW = 220, hpX = canvas.width/2 - hpW/2, hpY = 12;
+    ctx.fillStyle = '#1f2937'; ctx.fillRect(hpX, hpY, hpW, 14);
+    const filled = Math.min(1, state.bossHits / state.bossHitsNeeded);
+    ctx.fillStyle = '#f43f5e'; ctx.fillRect(hpX, hpY, hpW * filled, 14);
+    ctx.strokeStyle = '#00000050'; ctx.strokeRect(hpX, hpY, hpW, 14);
+  }
+
+  // particles
+  for(const p of state.particles){
+    const alpha = Math.max(0, 1 - p.age / p.life);
+    ctx.globalAlpha = alpha; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+  }
+
+  // overlays text
+  if(state.gameOver){
+    ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#ef4444'; ctx.font = '48px system-ui'; ctx.textAlign = 'center'; ctx.fillText('GAME OVER', canvas.width/2, canvas.height/2);
+  }
+  if(state.win){
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = '#60f0a5'; ctx.font = '44px system-ui'; ctx.textAlign = 'center'; ctx.fillText('YOU WIN!', canvas.width/2, canvas.height/2 - 10);
+    ctx.font = '18px system-ui'; ctx.fillText('Boss đã bị hạ. Quay về menu để chơi lại.', canvas.width/2, canvas.height/2 + 26);
+  }
+
+  // info text
+  ctx.fillStyle = '#e6eef8'; ctx.font='16px system-ui'; ctx.textAlign='left';
+  ctx.fillText(`Level: ${state.level}`, 10, 20);
+  ctx.fillText(`Kills: ${state.kills} / ${state.killsNeeded}`, 10, 40);
+
+  // progress bar percentage
+  const progressPercent = state.killsNeeded>0 ? Math.min(100,(state.kills/state.killsNeeded)*100) : 0;
+  progressBar.style.width = progressPercent + '%';
+}
+
+/* ==================== Input ==================== */
+window.addEventListener('keydown', (e)=>{
+  if(audioCtx.state === 'suspended'){ audioCtx.resume().catch(()=>{}); ytPlay(); }
+  const k = e.key;
+  if(k==='Escape' || k==='Esc'){ if(state.inGame || pauseOverlay.style.display==='flex'){ togglePause(); } return; }
+  if(!state.inGame) return;
+  if(state.isPaused) return;
+
+  // movement
+  // P1: WASD
+  if(k==='w' || k==='W') state.players[0].keys.up = true;
+  if(k==='a' || k==='A') state.players[0].keys.left = true;
+  if(k==='s' || k==='S') state.players[0].keys.down = true;
+  if(k==='d' || k==='D') state.players[0].keys.right = true;
+  // P2: arrows
+  if(state.twoPlayer){
+    if(k==='ArrowUp') state.players[1].keys.up = true;
+    if(k==='ArrowLeft') state.players[1].keys.left = true;
+    if(k==='ArrowDown') state.players[1].keys.down = true;
+    if(k==='ArrowRight') state.players[1].keys.right = true;
+  }
+
+  // dashes
+  if(k.toLowerCase()==='q') tryDash(state.players[0]);
+  if(state.twoPlayer && (k==='Shift' || k==='ShiftLeft' || k==='ShiftRight')) tryDash(state.players[1]);
+
+  // skills P1: E/F/Z
+  if(k.toLowerCase()==='e') skillKill(state.players[0]);
+  if(k.toLowerCase()==='f') skillGold(state.players[0]);
+  if(k.toLowerCase()==='z') skillAlly(state.players[0]);
+  // skills P2: I/O/P
+  if(state.twoPlayer){
+    if(k.toLowerCase()==='i') skillKill(state.players[1]);
+    if(k.toLowerCase()==='o') skillGold(state.players[1]);
+    if(k.toLowerCase()==='p') skillAlly(state.players[1]);
+  }
+});
+window.addEventListener('keyup', (e)=>{
+  const k = e.key;
+  if(!state.inGame) return;
+  // P1
+  if(k==='w' || k==='W') state.players[0].keys.up = false;
+  if(k==='a' || k==='A') state.players[0].keys.left = false;
+  if(k==='s' || k==='S') state.players[0].keys.down = false;
+  if(k==='d' || k==='D') state.players[0].keys.right = false;
+  // P2
+  if(state.twoPlayer){
+    if(k==='ArrowUp') state.players[1].keys.up = false;
+    if(k==='ArrowLeft') state.players[1].keys.left = false;
+    if(k==='ArrowDown') state.players[1].keys.down = false;
+    if(k==='ArrowRight') state.players[1].keys.right = false;
+  }
+});
+
+/* ==================== Dash ==================== */
+function tryDash(p){
+  if(!p.alive) return;
+  if(!p.dash.ready || p.dash.active || state.isPaused){ showToast(`P${p.idx}: Dash chưa sẵn sàng`, 1000); return; }
+  let dx = 0, dy = 0;
+  if(p.keys.up) dy -= 1;
+  if(p.keys.down) dy += 1;
+  if(p.keys.left) dx -= 1;
+  if(p.keys.right) dx += 1;
+  if(dx===0 && dy===0){ dx = 1; }
+  const inv = 1/Math.hypot(dx,dy); dx *= inv; dy *= inv;
+  p.dash.vx = dx * p.dash.speed;
+  p.dash.vy = dy * p.dash.speed;
+  p.dash.active = true; p.dash.ready = false;
+  p.dash.timer = 0; p.dash.cooldownTimer = 0;
+  swoosh();
+  addShake(4);
+  showToast(`P${p.idx}: Dash!`, 700);
+}
+
+/* ==================== Main loop ==================== */
+function loop(now){
+  const dt = (now - last) / 1000; last = now;
+  if(state.inGame){ update(dt); draw(); } else { updateParticles(dt); draw(); }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ==================== UI Buttons ==================== */
+playBtn.addEventListener('click', ()=>{
+  titleScreen.style.display='none';
+  modeSelectScreen.style.display='flex';
+});
+quitBtn.addEventListener('click', ()=> showToast("Ồ không thoát được nha 😏"));
+backFromMode.addEventListener('click', ()=>{ modeSelectScreen.style.display='none'; titleScreen.style.display='flex'; });
+
+// mode selection handlers
+document.querySelectorAll('.modeBtn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const chosen = btn.getAttribute('data-mode');
+    state.mode = chosen==='coop' ? 'normal' : chosen; // coop uses normal preset values (with coop overrides)
+    state.twoPlayer = (chosen==='coop');
+    applyModeSettings();
+    modeSelectScreen.style.display = 'none';
+    canvas.style.display='block';
+    progressBarContainer.style.display='block';
+    reset();
+    
+  document.getElementById('skillColumnP1').style.display='flex';
+  if(state.twoPlayer){ document.getElementById('skillColumnP2').style.display='flex'; }
+
+    state.inGame = true;
+    showToast(`Bắt đầu: ${chosen==='coop'?'2-Player Co-op':capitalize(chosen)} mode`, 1600);
+    ytPlay();
+  });
+});
+
+continueBtn.addEventListener('click', ()=>{ togglePause(false); });
+backToMenuBtn.addEventListener('click', ()=>{
+  togglePause(false); state.inGame=false; state.isPaused=false; state.gameOver=false; state.win=false;
+  canvas.style.display='none'; progressBarContainer.style.display='none'; titleScreen.style.display='flex'; modeLabel.style.display='none';
+});
+
+/* ==================== Pause overlay toggle ==================== */
+function togglePause(force){
+  if(typeof force === 'boolean'){ if(force === false){ state.isPaused=false; pauseOverlay.style.display='none'; return; } }
+  if(state.isPaused){ state.isPaused=false; pauseOverlay.style.display='none'; showToast('Tiếp tục chơi'); }
+  else { state.isPaused=true; pauseOverlay.style.display='flex'; showToast('Đã tạm dừng'); }
+}
+
+/* ==================== Init ==================== */
+updateHUD();
+showToast('Sẵn sàng! Nhấn Play để bắt đầu', 1600);
+</script>
+</body>
+</html>
